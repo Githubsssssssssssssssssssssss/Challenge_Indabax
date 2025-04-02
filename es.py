@@ -1178,19 +1178,20 @@ def main_app():
                 }
             </style>
             """, unsafe_allow_html=True)
-        row1_cols = st.columns([1,1,2,1.7,2,2,2])
+        #row1_cols = st.columns([1,1,2,1.7,2,2,2])
+        row1_cols = st.columns([1,1,1,1])
         with row1_cols[0]:
             
             Volonteers = load_data1().shape[0] +load_data2(get_modification_time()).shape[0]
             temp_content = format_card_content(get_text("Volonteers"), Volonteers)
-            create_card(temp_content, key="temperature", cell_height="90px", cell_width="105%")
+            create_card(temp_content, key="temperature", cell_height="90px", cell_width="103%")
 
         with row1_cols[1]:
             df1 = load_data1()
             df2 = load_data2(get_modification_time())
             eligible = df1[df1["ÉLIGIBILITÉ_AU_DON."] == "Eligible"].shape[0] + df2[df2["ÉLIGIBILITÉ_AU_DON."] == "Eligible"].shape[0]
             wind_content = format_card_content(get_text("Eligible"), eligible)
-            create_card(wind_content, key="wind", cell_height="90px", cell_width="105%")
+            create_card(wind_content, key="wind", cell_height="90px", cell_width="103%")
 
         with row1_cols[2]:
             T_eligible = df1[df1["ÉLIGIBILITÉ_AU_DON."] == "Temporairement Non-eligible"].shape[0] + df2[df2["ÉLIGIBILITÉ_AU_DON."] == "Temporairement Non-eligible"].shape[0]
@@ -1202,13 +1203,14 @@ def main_app():
             wind_content = format_card_content(get_text("Definitely Non-eligible"), T_eligible)
             create_card(wind_content, key="card", cell_height="90px", cell_width="103%")
 
-        with row1_cols[6]:
+        row1_cols = st.columns([1,1,1])
+        with row1_cols[1]:
             df =  get_combined_data()
             nomb = df['Si oui preciser la date du dernier don'].count()
             wind = format_card_content(get_text("Have Ever Donated"), nomb)
             create_card(wind, key="donated", cell_height="90px", cell_width="103%")
 
-        with row1_cols[4]:
+        with row1_cols[0]:
             df= load_data1()[(load_data1()['ÉLIGIBILITÉ_AU_DON.']=="Définitivement non-eligible")]
             df = df.dropna(subset=["Raison_indisponibilité_fusionnée"])
             df['Raison_indisponibilité_fusionnée'] = df["Raison_indisponibilité_fusionnée"].astype(str)
@@ -1219,7 +1221,7 @@ def main_app():
             wind = format_card_content(get_text("Most Ilegibility Purpose"), element_frequent)
             create_card(wind, key="available", cell_height="90px", cell_width="103%")
 
-        with row1_cols[5]:
+        with row1_cols[2]:
             df= load_data1()[(load_data1()['ÉLIGIBILITÉ_AU_DON.']=="Temporairement Non-eligible")]
             df = df.dropna(subset=["Raison_indisponibilité_fusionnée"])
             df['Raison_indisponibilité_fusionnée'] = df["Raison_indisponibilité_fusionnée"].astype(str)
