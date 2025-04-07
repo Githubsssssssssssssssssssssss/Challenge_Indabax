@@ -126,7 +126,7 @@
         "Blood Donation Facts": "Blood Donation Facts",
         "Every 2 seconds someone needs blood": "Every 2 seconds someone needs blood",
         "A single car accident victim can require up to 100 units of blood": "A single car accident victim can require up to 100 units of blood",
-        "Volonteers:": "Volonteers:" ,
+        "Volunteers:": "Volunteers:" ,
         "Eligible": "Eligible" ,
         "REGISTRATION" : "REGISTRATION",
         "Found": "Found",
@@ -153,10 +153,10 @@
         "Dataset Insights": "Dataset Insights",
         "Age distribution" :"Age distribution",
         "Industry sector": "Industry sector",
-        "Temporarily Non-eligible": "Temporarily Non-eligible",
+        "Temporarily Non eligible": "Temporarily Non-eligible",
         "Definitely Non-eligible": "Definitely Non-eligible",
         "Have Ever Donated"    :"Have Ever Donated ",
-        "Most Ilegibility Purpose" :"Most Ilegibility Purpose",
+        "Most Non elegibility Purpose" :"Most Non elegibility Purpose",
         "Most Non eligible Purpose" :"Most Non eligible Purpose",
         "Temporarily Eligibility Rate" :"Temporarily Eligibility Rate",
         "Eligibility Rate" :"Eligibility Rate",
@@ -213,7 +213,10 @@
         "Hemoglobin level (g/dL)": "Hemoglobin level (g/dL)",
         "Min threshold (F)": "Min threshold (F)",
         "Min threshold (H)": "Min threshold (H)",
-        "All": "All"
+        "All": "All",
+        "Most Non Availability Purpose":"Most Non Availability Purpose",
+        "Donor Insights" : "Donor Insights",
+        "Non eligibility and Unavailability purpose distribution" : "Non eligibility and Unavailability purpose distribution"
         },
     "French": {
         "Industry sector":"Secteur d'activité",
@@ -361,7 +364,7 @@
         "Blood cannot be manufactured it can only come from donors": "Le sang ne peut pas être fabriqué  il ne peut provenir que des donneurs",
         "Red blood cells have a shelf life of 42 days": "Les globules rouges ont une durée de conservation de 42 jours",
         "Platelets have a shelf life of just 5 days": "Les plaquettes ont une durée de conservation de seulement 5 jours",
-        "Volonteers": "Volontaires ",
+        "Volunteers": "Volontaires ",
         "Eligible": "Eligibles" ,
         "REGISTRATION" : "INSCRIPTION",
         "Found": "Trouvé",
@@ -386,10 +389,10 @@
         "Level":"Niveau",
         "By default, Nothing selected means all is selected" : "Par défaut, rien de sélectionné signifie que tout est sélectionné",
         "Dataset Insights":"Apercu de la base",
-        "Temporarily Non-eligible": "Temporairement non-eligible",
+        "Temporarily Non eligible": "Temporairement non-eligible",
         "Definitely Non-eligible": "Definitivement non-eligible",
         "Have Ever Donated": "A Deja donné du sang", 
-        "Most Ilegibility Purpose": "Cause la plus importante d'ineligibilité",
+        "Most Non elegibility Purpose": "Cause la plus importante de non-eligibilité",
         "Most Non eligible Purpose": "Cause la plus importante de non-eligible",
         "Temporarily Eligibility Rate": "Taux d'eligibilité temporaire",
         "Eligibility Rate": "Taux d'eligibilité",
@@ -445,7 +448,10 @@
         "Hemoglobin level (g/dL)": "Taux d'hémoglobine (g/dL)",
         "Min threshold (F)": "Seuil minimum (F)",
         "Min threshold (H)": "Seuil minimum (H)",
-        "All": "Tous"
+        "All": "Tous",
+        "Most Non Availability Purpose":"Raisons d'inéligibilité",
+        "Donor Insights" : "Stats des donneurs",
+        "Non eligibility and Unavailability purpose distribution" : "Distribution des raisons d'inéligibilité et d'indisponibilité"
 
 }      
 }

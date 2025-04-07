@@ -18,6 +18,9 @@ import json
 import re
 from functions import *
 import hashlib
+import qrcode
+import io
+from pathlib import Path
 
 
 
@@ -28,6 +31,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+def load_data1():
+        if "uploaded_data" in st.session_state:
+            return st.session_state["uploaded_data"]  # Load validated data
+        else:
+            return pd.read_excel('last.xlsx')  # Load default file if no uploaded data
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -35,7 +43,7 @@ def hash_password(password):
 # Fonction pour vérifier les identifiants
 def check_credentials(username, password):
     users = {
-        "outsider": hash_password("pass_outsider"),
+        "admin": hash_password("admin"),
     }
     if username in users and users[username] == hash_password(password):
         return True
@@ -59,26 +67,95 @@ def create_users_file():
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
 
-# Interface de connexion
+
 def login_form():
-    st.title("Connexion")
+    # Chemin vers votre image locale
+    img_path = "OIP.jpeg"  # Assurez-vous que le chemin est correct
+    img_absolute_path = Path(img_path).absolute()
+    st.image(img_absolute_path,width=500)
+    st.markdown(
+        f"""
+        <style>
+            .block-container {{
+                padding-top: 3.5rem;
+                padding-left: 25rem;
+                padding-right: 25rem;
+                position: relative;
+                z-index: 1;
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Interface d'authentification
+    st.title("Blood Donation Dashboard ")
+    st.subheader("Connect yourself  to continue")
     
     with st.form("login_form"):
-        username = st.text_input("Nom d'utilisateur")
-        password = st.text_input("Mot de passe", type="password")
-        submit = st.form_submit_button("Se connecter")
+        username = st.text_input("User")
+        password = st.text_input("Password", type="password")
+        submit = st.form_submit_button("Login")
         
         if submit:
             if check_credentials(username, password):
                 st.session_state["authenticated"] = True
                 st.session_state["username"] = username
-                st.success("Connexion réussie! valider a nouveau pour confirmer la connexion")
+                st.success("Connexion réussie! valider à nouveau pour confirmer la connexion")
+                load_data1()
                 st.rerun()
             else:
                 st.error("Nom d'utilisateur ou mot de passe incorrect")
 
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+def main():
+    # Initialize session state
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    if "file_uploaded" not in st.session_state:
+        st.session_state["file_uploaded"] = False
+    if "file_validated" not in st.session_state:
+        st.session_state["file_validated"] = False
+
+    # Authentication check
+    if not st.session_state["authenticated"]:
+        login_form()
+    elif not st.session_state["file_uploaded"]:
+        file_upload_page()
+    elif not st.session_state["file_validated"]:
+        file_upload_page()
+        st.success("File validated successfully! Proceed to the main app.")
+        
+    else:
+        main_app()
+
+
+
 #_____________________________________
 def main_app():
+    #_____________________________________________________________________________________________
+    @st.cache_resource
+    def get_text(key):
+        if 'language' not in st.session_state:
+            return key
+        if 'get_text' not in st.session_state:
+            return key
+        return st.session_state.get_text(key)
+    with st.sidebar:
+        pdf_path = "Rapport_CampagneDon_Sang_Indabax.pdf"
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()   
+        st.download_button(
+            label=get_text("Download the report"),
+            data=pdf_bytes,
+            file_name="document.pdf",
+            mime="application/pdf"
+        )
+    #________________________
     if st.sidebar.button("Déconnexion"):
         st.session_state["authenticated"] = False
         st.rerun()
@@ -107,10 +184,11 @@ def main_app():
     # Fonction pour charger les données avec la date de modification comme hash
     @st.cache_resource
     def load_data1():
-        df = pd.read_excel('last.xlsx')
-        #df = pd.read_excel('Challenge dataset.xlsx')
-        #df = pd.read_excel('DataChallengeFinale1.xlsx')
-        return df
+        if "uploaded_data" in st.session_state:
+            return st.session_state["uploaded_data"]  # Load validated data
+        else:
+            return pd.read_excel('last.xlsx')  # Load default file if no uploaded data
+
     def load_data3():
         df = pd.read_excel('last.xlsx', sheet_name="2020")
         return df
@@ -306,13 +384,7 @@ def main_app():
     # Import the challenge dataset
     #challenge_data = pd.read_excel('Challenge dataset.xlsx')
     # Apply custom CSS for the sidebar styling
-    @st.cache_resource
-    def get_text(key):
-        if 'language' not in st.session_state:
-            return key
-        if 'get_text' not in st.session_state:
-            return key
-        return st.session_state.get_text(key)
+
     st.markdown('''
     <style>
         /* Sidebar styles */
@@ -390,6 +462,8 @@ def main_app():
         "Eligibility and Profile": f"🩺 {get_text('Eligibility and Profile')}",
         "Campaign Insights": f"📊 {get_text('Campaign Insights')}",
         "Fidélisation": f"📊 {get_text('Fidélisation')}",
+        "Donor Insights": f"📊 {get_text('Donor Insights')}",
+        "AI Extensions": f"🤖 {get_text('AI Extensions')}",
         "Options": f"⚙️ {get_text('Options')}",
         "About": f"ℹ️ {get_text('About')}"
     }
@@ -404,7 +478,407 @@ def main_app():
         help="Sélectionnez une option du menu"
     )
 
-    if selected_item =="Fidélisation":
+
+
+    if selected_item =="Donor Insights":
+                
+        # CSS amélioré avec plus de rouge
+        st.markdown("""
+            <style>
+            .main {
+                background-color: #f8f9fa; /* Blanc cassé élégant */
+                padding: 20px;
+            }
+            h1, h2 {
+                color: #c0392b; /* Rouge sang pour les titres */
+                font-family: 'Helvetica Neue', sans-serif;
+                font-weight: bold;
+                font-size: 32px;
+                text-align: center;
+            }
+            .stMarkdown {
+                font-family: 'Helvetica Neue', sans-serif;
+                color: #333333; /* Gris anthracite doux */
+            }
+            .metric-card {
+                border-radius: 10px;
+                padding: 25px;
+                margin: 15px 0;
+                text-align: center;
+                background-color: #ffffff;
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+                transition: all 0.3s ease;
+                border: 1px solid #e0e0e0;
+            }
+            .metric-card:hover {
+                transform: translateY(-8px);
+                box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+                border: 1px solid #c0392b; /* Rouge au survol */
+            }
+            .metric-title {
+                font-size: 22px;
+                font-weight: bold;
+                margin-bottom: 12px;
+                color: #333333;
+            }
+            .metric-value {
+                font-size: 32px;
+                font-weight: bold;
+                color: #ffffff;
+                border-radius: 8px;
+                padding: 8px 16px;
+                display: inline-block;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        # Lecture des données
+        df =load_data3()
+        df['Age'] = pd.to_numeric(df['Age'], errors='coerce')
+        df = df.dropna(subset=['Age'])
+        df['Age'] = df['Age'].astype(int)
+        df['Type de donation'] = df['Type de donation'].fillna('Sang total')
+        df['Type de donation'] = df['Type de donation'].replace({'F': 'Sang total', 'B': 'Sang total'})
+
+        # Partie 2 : Indicateurs clés
+        st.header("Indicateurs clés")
+
+        # Calcul des indicateurs
+        total_donors = len(df)
+        total_dons_max = (df[df['Sexe'] == 'M']['Age'].count() * 6) + (df[df['Sexe'] == 'F']['Age'].count() * 3)
+        donation_goal = 10000
+        percent_achieved = (total_donors / donation_goal) * 100
+        most_donated_blood = df['Groupe Sanguin ABO / Rhesus'].value_counts().idxmax()
+        most_frequent_don_type = df['Type de donation'].value_counts().idxmax()
+        #average_age = df['Age'].mean()
+
+        # Palette de couleurs avec plus de rouge
+        professional_colors = {
+            'total_donors': '#ffe6e6',      # Rouge pâle
+            'percent_achieved': '#ffcccc',  # Rouge très clair
+            'most_donated_blood': '#e6f0fa',# Bleu clair (contraste)
+            'most_frequent_don_type': '#f5f5f5', # Gris clair
+            'average_age': '#e8f5e9'        # Vert pâle
+        }
+
+        # Grille de 5 colonnes pour les indicateurs
+        cols = st.columns(4)
+
+        with cols[0]:
+            st.markdown(
+                f"""
+                <div class="metric-card" style="background-color: {professional_colors['total_donors']};">
+                    <div class="metric-title">Nombre total de donneurs</div>
+                    <div class="metric-value" style="background: linear-gradient(90deg, #c0392b 0%, #8e1e18 100%);">{total_donors}</div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+
+        with cols[1]:
+            st.markdown(
+                f"""
+                <div class="metric-card" style="background-color: {professional_colors['percent_achieved']};">
+                    <div class="metric-title">Pourcentage atteint</div>
+                    <div class="metric-value" style="background: linear-gradient(90deg, #e74c3c 0%, #a93226 100%);">{percent_achieved:.2f}%</div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+
+        with cols[2]:
+            st.markdown(
+                f"""
+                <div class="metric-card" style="background-color: {professional_colors['most_donated_blood']};">
+                    <div class="metric-title">Sang le plus donné</div>
+                    <div class="metric-value" style="background: linear-gradient(90deg, #2980b9 0%, #1b5678 100%);">{most_donated_blood}</div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+
+        with cols[3]:
+            st.markdown(
+                f"""
+                <div class="metric-card" style="background-color: {professional_colors['most_frequent_don_type']};">
+                    <div class="metric-title">Type de don fréquent</div>
+                    <div class="metric-value" style="background: linear-gradient(90deg, #7f8c8d 0%, #566061 100%);">{most_frequent_don_type}</div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+
+        # with cols[4]:
+        #     st.markdown(
+        #         f"""
+        #         <div class="metric-card" style="background-color: {professional_colors['average_age']};">
+        #             <div class="metric-title">Âge moyen</div>
+        #             <div class="metric-value" style="background: linear-gradient(90deg, #27ae60 0%, #1b7944 100%);">{average_age:.1f} ans</div>
+        #         </div>
+        #         """, unsafe_allow_html=True
+        #     )
+
+        # Partie 3 : Analyse des donneurs
+        horodateur(df)
+        row1 = st.columns(2)
+        row2 = st.columns(2)
+        row3 = st.columns(1)
+    
+        st.header("Analyse des donneurs")
+        # Graphique 1 : Répartition par groupes sanguins (Donut chart)
+        with row1[0]:
+            blood_group_counts = df['Groupe Sanguin ABO / Rhesus'].value_counts()
+            fig1 = go.Figure(data=[
+                go.Pie(labels=blood_group_counts.index, values=blood_group_counts.values, 
+                    textinfo='label+percent', insidetextorientation='radial',
+                    marker=dict(colors=['#c0392b', '#e74c3c', '#3498db', '#7f8c8d', '#2980b9', '#e6f0fa', '#f0f4f8', '#ffcccc']),
+                    hole=0.4)
+            ])
+            fig1.update_layout(
+                title="Répartition par groupes sanguins",
+                title_font_size=18,
+                title_x=0.5,
+                showlegend=True,
+                height=400,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=50, b=50, l=50, r=50)
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+
+        # Graphique 2 : Répartition par âges (Histogramme)
+        with row1[1]:
+            fig2 = px.histogram(df, x='Age', nbins=15, color_discrete_sequence=['#c0392b'],
+                                labels={'Age': 'Âge', 'count': 'Nombre de donneurs'})
+            fig2.add_vline(x=df['Age'].mean(), line_dash="dash", line_color="#e74c3c",
+                        annotation_text=f"Moyenne: {df['Age'].mean():.1f}", annotation_position="top right")
+            fig2.update_layout(
+                title="Répartition par âges",
+                title_font_size=18,
+                title_x=0.5,
+                xaxis_title="Âge",
+                yaxis_title="Nombre de donneurs",
+                bargap=0.1,
+                height=400,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=50, b=50, l=50, r=50)
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+
+        # Graphique 3 : Sexe par groupe sanguin (Barres empilées)
+        with row2[0]:
+            sex_blood_group = pd.crosstab(df['Groupe Sanguin ABO / Rhesus'], df['Sexe'])
+            fig3 = go.Figure(data=[
+                go.Bar(name='Hommes', x=sex_blood_group.index, y=sex_blood_group['M'], marker_color='#c0392b'),  # Rouge naturel
+                go.Bar(name='Femmes', x=sex_blood_group.index, y=sex_blood_group['F'], marker_color='#3498db')   # Bleu naturel
+            ])
+            fig3.update_layout(
+                barmode='stack',
+                title="Sexe par groupe sanguin",
+                title_font_size=18,
+                title_x=0.5,
+                xaxis_title="Groupe sanguin",
+                yaxis_title="Nombre de donneurs",
+                legend_title="Sexe",
+                height=400,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=50, b=50, l=50, r=50)
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+
+        # Graphique 4 : Âge par groupe sanguin (Box plot)
+        with row2[1]:
+            fig4 = go.Figure()
+            for i, blood_group in enumerate(df['Groupe Sanguin ABO / Rhesus'].unique()):
+                fig4.add_trace(go.Box(
+                    y=df[df['Groupe Sanguin ABO / Rhesus'] == blood_group]['Age'],
+                    name=blood_group,
+                    marker_color=['#c0392b', '#e74c3c', '#3498db', '#7f8c8d', '#2980b9', '#ffcccc', '#f0f4f8', '#e6f0fa'][i % 8],
+                    boxpoints='outliers',
+                    jitter=0.3,
+                    line_width=1.5
+                ))
+            fig4.update_layout(
+                title="Âge par groupe sanguin",
+                title_font_size=18,
+                title_x=0.5,
+                xaxis_title="Groupe sanguin",
+                yaxis_title="Âge",
+                height=400,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=50, b=50, l=50, r=50),
+                showlegend=True
+            )
+            st.plotly_chart(fig4, use_container_width=True)
+
+        # Graphique 5 : Lien entre groupes sanguins et types de don en pourcentage (Barres empilées)
+        with row3[0]:
+            blood_group_donation = pd.crosstab(df['Groupe Sanguin ABO / Rhesus'], df['Type de donation'])
+            blood_group_donation_pct = blood_group_donation.div(blood_group_donation.sum(axis=1), axis=0) * 100
+            fig5_new = go.Figure()
+            colors = ['#c0392b', '#3498db', '#7f8c8d']  # Rouge, Bleu, Gris naturel
+            for i, donation_type in enumerate(blood_group_donation_pct.columns):
+                fig5_new.add_trace(go.Bar(
+                    x=blood_group_donation_pct.index,
+                    y=blood_group_donation_pct[donation_type],
+                    name=donation_type,
+                    marker_color=colors[i % len(colors)],
+                    text=[f"{val:.1f}%" for val in blood_group_donation_pct[donation_type]],
+                    textposition='inside'
+                ))
+            fig5_new.update_layout(
+                barmode='stack',
+                title="Pourcentage des types de don par groupe sanguin",
+                title_font_size=18,
+                title_x=0.5,
+                xaxis_title="Groupe sanguin",
+                yaxis_title="Pourcentage (%)",
+                legend_title="Type de donation",
+                height=400,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=50, b=50, l=50, r=50),
+                yaxis=dict(range=[0, 100])
+            )
+            st.plotly_chart(fig5_new, use_container_width=True)
+
+        # Graphique 6 : Répartition par type de donation (Barres empilées)
+        st.subheader("Répartition par type de donation")
+        donation_type_sex = pd.crosstab(df['Type de donation'], df['Sexe'])
+        fig6 = go.Figure(data=[
+            go.Bar(name='Hommes', x=donation_type_sex.index, y=donation_type_sex['M'], marker_color='#c0392b'),  # Rouge naturel
+            go.Bar(name='Femmes', x=donation_type_sex.index, y=donation_type_sex['F'], marker_color='#3498db')   # Bleu naturel
+        ])
+        fig6.update_layout(
+            barmode='stack',
+            title="Répartition par type de donation",
+            title_font_size=18,
+            title_x=0.5,
+            xaxis_title="Type de donation",
+            yaxis_title="Nombre de donneurs",
+            legend_title="Sexe",
+            height=400,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=50, b=50, l=50, r=50)
+        )
+        st.plotly_chart(fig6, use_container_width=True)
+
+        # Partie : Atteintes des objectifs par groupe sanguin
+        st.header("Atteintes des objectifs par groupe sanguin")
+
+        # Objectif total et répartition basée sur la demande globale
+        donation_goal = 10000
+        blood_group_demand = {
+            'O+': 0.35, 'A+': 0.30, 'B+': 0.10, 'AB+': 0.05,
+            'O-': 0.07, 'A-': 0.06, 'B-': 0.02, 'AB-': 0.01
+        }
+        blood_groups = df['Groupe Sanguin ABO / Rhesus'].unique()
+        blood_group_counts = df['Groupe Sanguin ABO / Rhesus'].value_counts().to_dict()
+
+        # Calcul des objectifs par groupe sanguin
+        goal_per_group = {bg: blood_group_demand.get(bg, 0.05) * donation_goal for bg in blood_groups}
+        collected_per_group = blood_group_counts
+
+        # Filtre interactif
+        selected_blood_group = st.selectbox("Choisir un groupe sanguin", options=['Tous'] + list(blood_groups))
+
+        # Disposition en 2 colonnes
+        obj_cols = st.columns([2, 1])
+
+        # Graphique 7 : Comparaison collecté vs objectif (Barres juxtaposées)
+        with obj_cols[0]:
+            if selected_blood_group == 'Tous':
+                fig7 = go.Figure(data=[
+                    go.Bar(name='Objectif', x=list(goal_per_group.keys()), y=list(goal_per_group.values()), marker_color='#3498db'),  # Bleu naturel
+                    go.Bar(name='Collecté', x=list(goal_per_group.keys()), y=[collected_per_group.get(bg, 0) for bg in goal_per_group.keys()], marker_color='#c0392b')  # Rouge naturel
+                ])
+            else:
+                fig7 = go.Figure(data=[
+                    go.Bar(name='Objectif', x=[selected_blood_group], y=[goal_per_group[selected_blood_group]], marker_color='#3498db'),  # Bleu naturel
+                    go.Bar(name='Collecté', x=[selected_blood_group], y=[collected_per_group.get(selected_blood_group, 0)], marker_color='#c0392b')  # Rouge naturel
+                ])
+            fig7.update_layout(
+                barmode='group',
+                title=f"Collecté vs Objectif ({selected_blood_group})",
+                title_font_size=18,
+                title_x=0.5,
+                xaxis_title="Groupe sanguin",
+                yaxis_title="Nombre de poches",
+                height=400,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                margin=dict(t=50, b=50, l=50, r=50),
+                showlegend=True
+            )
+            st.plotly_chart(fig7, use_container_width=True)
+
+        # Graphique 8 : Jauge (Gauge) pour le pourcentage atteint
+        with obj_cols[1]:
+            if selected_blood_group == 'Tous':
+                total_collected = sum(collected_per_group.values())
+                total_goal = donation_goal
+                percent_achieved_total = (total_collected / total_goal) * 100
+                options8 = {
+                    "series": [
+                        {
+                            "type": "gauge",
+                            "startAngle": 180,
+                            "endAngle": 0,
+                            "min": 0,
+                            "max": 100,
+                            "splitNumber": 10,
+                            "itemStyle": {"color": "#c0392b"},
+                            "progress": {"show": True, "width": 20, "itemStyle": {"color": "#e74c3c"}},
+                            "pointer": {"show": True},
+                            "axisLine": {"lineStyle": {"width": 20, "color": [[1, "#ffcccc"]]}},
+                            "axisTick": {"show": False},
+                            "splitLine": {"length": 15, "lineStyle": {"width": 2, "color": "#999"}},
+                            "axisLabel": {"distance": 25, "color": "#999", "fontSize": 12},
+                            "detail": {
+                                "valueAnimation": True,
+                                "fontSize": 20,
+                                "color": "#c0392b",
+                                "offsetCenter": [0, "70%"],
+                                "formatter": "{value}%"
+                            },
+                            "data": [{"value": percent_achieved_total, "name": "Atteint"}]
+                        }
+                    ]
+                }
+                st_echarts(options=options8, height="400px", key="gauge_total")
+            else:
+                collected = collected_per_group.get(selected_blood_group, 0)
+                goal = goal_per_group[selected_blood_group]
+                percent_achieved_group = (collected / goal) * 100
+                options8 = {
+                    "series": [
+                        {
+                            "type": "gauge",
+                            "startAngle": 180,
+                            "endAngle": 0,
+                            "min": 0,
+                            "max": 100,
+                            "splitNumber": 10,
+                            "itemStyle": {"color": "#c0392b"},
+                            "progress": {"show": True, "width": 20, "itemStyle": {"color": "#e74c3c"}},
+                            "pointer": {"show": True},
+                            "axisLine": {"lineStyle": {"width": 20, "color": [[1, "#ffcccc"]]}},
+                            "axisTick": {"show": False},
+                            "splitLine": {"length": 15, "lineStyle": {"width": 2, "color": "#999"}},
+                            "axisLabel": {"distance": 25, "color": "#999", "fontSize": 12},
+                            "detail": {
+                                "valueAnimation": True,
+                                "fontSize": 20,
+                                "color": "#c0392b",
+                                "offsetCenter": [0, "70%"],
+                                "formatter": "{value}%"
+                            },
+                            "data": [{"value": round(percent_achieved_group, 2), "name": f"Atteint ({selected_blood_group})"}]
+                        }
+                    ]
+                }
+                st_echarts(options=options8, height="400px", key=f"gauge_{selected_blood_group}")
+    elif selected_item =="Fidélisation":
         st.markdown("""
             <style>
             .block-container {
@@ -479,7 +953,7 @@ def main_app():
                     x=count_recurrent.index if orientation == 'v' else count_recurrent.values,
                     y=count_recurrent.values if orientation == 'v' else count_recurrent.index,
                     name='Récurrents (Oui)',
-                    marker_color='#00cc96',
+                    marker_color='#EC8282',
                     text=count_recurrent.values,
                     textposition='auto',
                     orientation='h' if orientation == 'h' else 'v'
@@ -502,7 +976,7 @@ def main_app():
                     x=count_recurrent.index if orientation == 'v' else count_recurrent.values,
                     y=count_recurrent.values if orientation == 'v' else count_recurrent.index,
                     name='Récurrents',
-                    marker_color='#00cc96',
+                    marker_color='#EC8282',
                     text=count_recurrent.values,
                     textposition='auto',
                     orientation='h' if orientation == 'h' else 'v'
@@ -548,7 +1022,7 @@ def main_app():
         df_temp_women = df_temp_non_eligible[df_temp_non_eligible['Genre_'] == 'Femme']
 
         # Définir une palette de couleurs
-        color_men = '#1f77b4'
+        color_men = '#F50307'
         color_women = '#ff7f0e'
 
         # Fonction pour générer un graphique Plotly
@@ -604,7 +1078,7 @@ def main_app():
             fig.add_trace(go.Bar(
                 x=list(reason_counts.keys()),
                 y=list(reason_counts.values()),
-                marker_color='#FF6347',
+                marker_color="#F50307",
                 text=[str(val) for val in reason_counts.values()],
                 textposition='auto',
                 textfont=dict(size=16, color='white', family='Arial Black')
@@ -702,7 +1176,7 @@ def main_app():
         st.plotly_chart(plot_hemoglobin_box(df))
         #_______________________________________________________
 
-    if selected_item =="Campaign Insights":
+    elif selected_item =="Campaign Insights":
         st.markdown("""
     <style>
         .card-title {
@@ -783,7 +1257,7 @@ def main_app():
         st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 24px; font-weight: bold; color: #FF5A5A;">
         {get_text("Welcome to the  campaign Insight Section")}
         </div> """,  unsafe_allow_html=True)
-        filtered_data['Date de remplissage de la fiche'] = pd.to_datetime(df['Date de remplissage de la fiche'])
+        filtered_data['Date de remplissage de la fiche'] = pd.to_datetime(load_data1()['Date de remplissage de la fiche'])
         m= filtered_data['Date de remplissage de la fiche'].dt.month
         month_counts = m.value_counts().sort_index()
         categories = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
@@ -792,8 +1266,9 @@ def main_app():
         filtered_data1 = combined_data[(combined_data['ÉLIGIBILITÉ_AU_DON.']=="Définitivement non-eligible")]
         filtered_data2 = combined_data[(combined_data['ÉLIGIBILITÉ_AU_DON.']=="Temporairement Non-eligible")]
 
-        row1_cos = st.columns(1)
+        row1_cos = st.columns(2)
         create_metric_card(row1_cos[0],title="Number of Donors By Months",plot_function=lambda: plot_radar_chart(data, categories),width="100%") 
+        create_metric_card(row1_cos[1],title="Number of Donors By Months and by eligibility status",plot_function=lambda: by_months_status(filtered_data),width="100%") 
         
         st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 24px; font-weight: bold; color: #FF5A5A;">
         {get_text("")}</div> """,  unsafe_allow_html=True)
@@ -812,11 +1287,18 @@ def main_app():
 
         st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 24px; font-weight: bold; color: #FF5A5A;">
         {get_text("")}</div> """,  unsafe_allow_html=True)
-        row1_cos = st.columns(2)
-        create_metric_card(row1_cos[0],title=get_text("Non Eligibility Purposes"),plot_function=lambda: generate_wordcloud_and_barchart(filtered_data1),width="100%") 
-        create_metric_card(row1_cos[1],title=get_text("Non Availability purposes"),plot_function=lambda:generate_wordcloud_and_barchart(filtered_data2),width="100%") 
 
-    if selected_item =="Eligibility and Profile" : 
+        row1_cos = st.columns(2)
+        create_metric_card(row1_cos[0],title=get_text("Others  Non Availability purposes"),plot_function=lambda: generate_wordcloud(filtered_data['Autre raisons,  preciser'].dropna()),width="100%") 
+        create_metric_card(row1_cos[1],title=get_text("Others Non Eligibility Purposes"),plot_function=lambda: generate_wordcloud(filtered_data[filtered_data['ÉLIGIBILITÉ_AU_DON.'] == 'Définitivement non-eligible']['Si autres raison préciser'].dropna()),width="100%") 
+        
+        row1_cos = st.columns(2)
+        create_metric_card(row1_cos[1],title=get_text("Non Eligibility purposes"),plot_function=lambda:generate_wordcloud_and_barchart(filtered_data1),width="100%") 
+        create_metric_card(row1_cos[0],title=get_text("Non Availability purposes"),plot_function=lambda:generate_wordcloud_and_barchart(filtered_data2),width="100%") 
+         
+
+
+    elif selected_item =="Eligibility and Profile" : 
         st.markdown("""
     <style>
         .card-title {
@@ -916,7 +1398,7 @@ def main_app():
         create_metric_card(row1_cos[0],title=get_text("Eligibility In Douala"),plot_function=lambda: three(filtered_data),width="100%") 
 
 
-    if selected_item == "Dataset Insights":
+    elif selected_item == "Dataset Insights":
         st.markdown("""
     <style>
         .card-title {
@@ -1013,7 +1495,7 @@ def main_app():
         create_metric_card(cols[0], title=get_text('Age distribution'), plot_function=lambda: st_echarts(options=option, height=400, width="100%"), width="100%")
         create_metric_card(cols[1], title=get_text('Population Pyramid'), plot_function=lambda: plot_age_pyramid(filtered_data, height=400), width="100%")
 
-    if selected_item == "Options":
+    elif selected_item == "Options":
         st.markdown(
             """
             <h1 style='color: red; text-align: center; margin-top: 0;'>Options</h1>
@@ -1127,38 +1609,33 @@ def main_app():
         if st.button(get_text("Apply Language"), key="apply_language_button"):
             st.success(f"Language will be changed to {st.session_state.widget_language  }! Click Again to confirm. ")
             apply_language()
+        col=st.columns(2)
+        with col[1]:
+            st.image("OIP.jpeg", width=500)
                     
-    if selected_item == "Home":
-        n=0.811111
+    elif selected_item == "Home":
+        site_url = "https://githubsssssssssssssssssssssss-challenge-es-zdqvvx.streamlit.app/"
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(site_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        st.sidebar.image(buffered)
     
         col = st.columns(1)
 
         with col[0]: 
-            with stylable_container(
-                key='842',
-                css_styles="""
-                    {border: 1px solid #c0c0c0;
-                    border-radius: 10px;
-                    margin: 0px;  # Small margin for spacing
-                    top : 7px;
-                    padding: 10px ; 
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-                    transition: all 0.2s ease;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    color: green;
-                    }
-                    
-                """
-            ):
-                st.markdown(
-                    f"""
-                    <div class="card-title" style="text-align: center; font-size: 29px; font-weight: bold; color: red;">
-                        {get_text("Welcome to Our Blood Donation Campaign Dashboard")}
+            st.markdown(
+        f"""
+        <div class="metric-box" style="background-color: #FFFBF5; height : 80px">
+            <div class="metric-title" style="text-align: center; font-size: 29px; font-weight: bold; color: red;">{get_text("Welcome to Our Blood Donation Campaign Dashboard")}
                     </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+</div>
+           
+        """,
+        unsafe_allow_html=True
+    )           
 
             
         st.markdown("""
@@ -1166,7 +1643,7 @@ def main_app():
             .block-container {
                 padding-top: 2rem;
                 padding-bottom: 0rem;
-                padding-left: 2rem;
+                padding-left: 5rem;
                 padding-right: 2rem;
                 margin-top: 0px;
             }
@@ -1178,37 +1655,112 @@ def main_app():
                 }
             </style>
             """, unsafe_allow_html=True)
-        #row1_cols = st.columns([1,1,2,1.7,2,2,2])
+        st.markdown(
+    """
+    <style>
+    .sidebar .sidebar-content {
+        background-color: #2C3E50;
+        color: white;
+    }
+    .metric-box {
+        border-radius: 30px;
+        padding: 1px;
+        margin: 10px;
+        text-align: center;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        transition: all 0.5s ease;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        height: 160px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    .metric-box:hover {
+        transform: scale(1.1) rotate(0deg);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    }
+    .metric-box h1 {
+        font-size: 40px;
+        color: white;
+        text-shadow: 2px 2px 6px rgba(0,0,0,0.4);
+    }
+    .metric-box p {
+        font-size: 22px;
+        color: white;
+        margin: 15px 0 0 0;
+        text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+        z-index: 1;
+        font-weight: bold;
+    }
+        </style>
+    """,
+    unsafe_allow_html=True
+)
+
         row1_cols = st.columns([1,1,1,1])
         with row1_cols[0]:
             
             Volonteers = load_data1().shape[0] +load_data2(get_modification_time()).shape[0]
-            temp_content = format_card_content(get_text("Volonteers"), Volonteers)
-            create_card(temp_content, key="temperature", cell_height="90px", cell_width="103%")
-
+            
+            st.markdown(f"""
+            <div class="metric-box " style="background: linear-gradient(135deg, #6D8299, #A3BFFA)";>
+                <h1>{Volonteers}💪</h1>
+                <p><strong >{get_text("Volunteers")}</strong></p>
+            </div>
+            """, unsafe_allow_html=True)
+    
         with row1_cols[1]:
             df1 = load_data1()
             df2 = load_data2(get_modification_time())
             eligible = df1[df1["ÉLIGIBILITÉ_AU_DON."] == "Eligible"].shape[0] + df2[df2["ÉLIGIBILITÉ_AU_DON."] == "Eligible"].shape[0]
-            wind_content = format_card_content(get_text("Eligible"), eligible)
-            create_card(wind_content, key="wind", cell_height="90px", cell_width="103%")
+            st.markdown(f"""
+        <div class="metric-box " style="background: linear-gradient(135deg, #2E7D32, #81C784)";>
+            <h1>{eligible} ✅</h1>
+            <p><strong>{get_text("Eligibles")}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
         with row1_cols[2]:
             T_eligible = df1[df1["ÉLIGIBILITÉ_AU_DON."] == "Temporairement Non-eligible"].shape[0] + df2[df2["ÉLIGIBILITÉ_AU_DON."] == "Temporairement Non-eligible"].shape[0]
-            wind_content = format_card_content(get_text("Temporarily Non-eligible"), T_eligible)
-            create_card(wind_content, key="humidity", cell_height="90px", cell_width="103%")
+            st.markdown(f"""
+        <div class="metric-box" style="background: linear-gradient(135deg, #F9A825, #FFCA28)">
+            <h1>{T_eligible} ⚠️</h1>
+            <p><strong>{get_text("Temporarily Not Eligible")}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
         with row1_cols[3]:
             T_eligible = df1[df1["ÉLIGIBILITÉ_AU_DON."] == "Définitivement non-eligible"].shape[0] + df2[df2["ÉLIGIBILITÉ_AU_DON."] == "Définitivement non-eligible"].shape[0]
-            wind_content = format_card_content(get_text("Definitely Non-eligible"), T_eligible)
-            create_card(wind_content, key="card", cell_height="90px", cell_width="103%")
+            st.markdown(
+        f"""
+        <div class="metric-box " style="background: linear-gradient(135deg, #C2185B, #F06292)">
+            <h1>{T_eligible} ❌</h1>
+            <p><strong>{get_text("Definitely Non-eligible")}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        row1_cols = st.columns([1,1,1])
+        row1_cols = st.columns([0.8,0.7,1])
         with row1_cols[1]:
             df =  get_combined_data()
             nomb = df['Si oui preciser la date du dernier don'].count()
-            wind = format_card_content(get_text("Have Ever Donated"), nomb)
-            create_card(wind, key="donated", cell_height="90px", cell_width="103%")
+            st.markdown(
+        f"""
+         <div class="metric-box" style="background: linear-gradient(135deg, #ED9ED6, #C683D7)">
+            <h1>{ nomb}❤️</h1>
+            <p><strong>{get_text("Have Ever Donated")}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
         with row1_cols[0]:
             df= load_data1()[(load_data1()['ÉLIGIBILITÉ_AU_DON.']=="Définitivement non-eligible")]
@@ -1218,8 +1770,15 @@ def main_app():
             df_exploded = df.explode("Raison_indisponibilité_fusionnée")
             df_exploded = df_exploded.dropna(subset=["Raison_indisponibilité_fusionnée"])
             element_frequent = df_exploded["Raison_indisponibilité_fusionnée"].mode()[0]
-            wind = format_card_content(get_text("Most Ilegibility Purpose"), element_frequent)
-            create_card(wind, key="available", cell_height="90px", cell_width="103%")
+            st.markdown(
+        f"""
+        <div class="metric-box" style="background: linear-gradient(135deg, #FFC436, #D2DE32)">
+            <h1>{element_frequent} 🩺</h1>
+            <p><strong>{get_text("Most Non eligibility Purpose")}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
         with row1_cols[2]:
             df= load_data1()[(load_data1()['ÉLIGIBILITÉ_AU_DON.']=="Temporairement Non-eligible")]
@@ -1229,8 +1788,15 @@ def main_app():
             df_exploded = df.explode("Raison_indisponibilité_fusionnée")
             df_exploded = df_exploded.dropna(subset=["Raison_indisponibilité_fusionnée"])
             element_frequent = df_exploded["Raison_indisponibilité_fusionnée"].mode()[0]
-            wind = format_card_content(get_text("Most Non Availability Purpose"), element_frequent)
-            create_card(wind, key="eligible", cell_height="90px", cell_width="103%")
+            st.markdown(
+        f"""
+        <div class="metric-box " style="background: linear-gradient(15deg, #AED2FF, #6F42C1)">
+            <h1 style="font-size: 33px">{element_frequent} 🩸 </h1>
+            <p><strong>{get_text("Most Non Availability Purpose")}</strong></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
         gdf = load_shapefile("gadm41_CMR_0.shp")
         data_df_3 = get_preprocessed_data(3)
@@ -1247,7 +1813,7 @@ def main_app():
                         border-radius: 10px;
                         flex-direction: column;
                         background-color: #f8f9fa;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.8);
+                        box-shadow: 0px 4px 6px  2px rgba(0, 0, 0, 0.8);
                         }}
                         
                         .card-title {{
@@ -1296,10 +1862,10 @@ def main_app():
                                     "backgroundColor": "red",
                                     "width": "100%",
                                     "lineHeight": 25,
-                                    "height": 15,
+                                    "height": 16,
                                     "borderRadius": 188,
                                     "offsetCenter": [0, "40%"],
-                                    "fontSize": 12
+                                    "fontSize": 18
                                 },
                                 "data": [{
                                     "value": round(100*eligible/Volonteers, 1),  # Example value
@@ -1344,10 +1910,10 @@ def main_app():
                                     "backgroundColor": "red",
                                     "width": "100%",
                                     "lineHeight": 25,
-                                    "height": 15,
+                                    "height": 16,
                                     "borderRadius": 188,
                                     "offsetCenter": [0, "40%"],
-                                    "fontSize": 12
+                                    "fontSize": 18
                                 },
                                 "data": [{
                                     "value": round(100*T_eligible/Volonteers, 1),  # Example value
@@ -1392,14 +1958,14 @@ def main_app():
                                     "backgroundColor": "red",
                                     "width": "100%",
                                     "lineHeight": 25,
-                                    "height": 15,
+                                    "height": 16,
                                     "borderRadius": 188,
                                     "offsetCenter": [0, "40%"],
-                                    "fontSize": 12
+                                    "fontSize": 18
                                 },
                                 "data": [{
                                     "value": round(100*(Volonteers-eligible-T_eligible)/Volonteers, 1),  # Example value
-                                    "name": get_text("Ilegibility Rate"), #"Ilegibility Rate"
+                                    "name": get_text("Non Eligibility Rate"), #"Ilegibility Rate"
                                 }]
                             }
                         ]
@@ -1435,7 +2001,7 @@ def main_app():
                     st.write("")
                     with row_1[0] :
                         st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 20px; font-weight: bold; color:red">{get_text("Blood distribution")}</div> """,  unsafe_allow_html=True)       
-                        pie_data = count_frequencies(load_data3()["Groupe Sanguin ABO / Rhesus "])
+                        pie_data = count_frequencies(load_data3()["Groupe Sanguin ABO / Rhesus"])
                         render_frequency_pie2(pie_data)
                     with row_1[1] :
                         st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 20px; font-weight: bold; color:red">{get_text("Donation Type")}</div> """,  unsafe_allow_html=True)       
@@ -1498,7 +2064,7 @@ def main_app():
             with stylable_container(
                 key='1201',
                 css_styles=f"""
-                    {{width : 110%;
+                    {{width : 100%;
                         border: 1px solid #c0c0c0;
                     border-radius: 10px;
                     margin: 0px;  # Small margin for spacing
@@ -1523,7 +2089,7 @@ def main_app():
                         }}
                 """ ):
                     st.write("")
-                    row_1 = st.columns(2)
+                    row_1 = st.columns([1,0.8])
                     with row_1[1] :
                         st.dataframe(data_df_3.head(5), use_container_width=True)
                         st.dataframe(data_df_2.head(8), use_container_width=True)
@@ -1591,9 +2157,8 @@ def main_app():
             with stylable_container(
                 key='1294',
                 css_styles=f"""
-                    {{width : 95%;
+                    {{width : 100%;
                     
-                    left : 5%;
                         border: 1px solid #c0c0c0;
                     border-radius: 10px;
                     margin: 0px;  # Small margin for spacing
@@ -1627,14 +2192,18 @@ def main_app():
                     jour(load_data1(),height="400px")
                     number_line(load_data1())  
 
+        row1_cos = st.columns(1)
+        create_metric_card(row1_cos[0],title=get_text("Non eligibility and Unavailability purpose distribution"),plot_function=lambda: women_reasons(df = get_combined_data()),height=500) 
+
         
     elif selected_item == "Donations":
         with st.sidebar:
-            donations_button = st.sidebar.button("Registration", use_container_width=True)
+            donations_button = st.sidebar.button("Volunteer registration", use_container_width=True)
             dataset_button = st.sidebar.button("Dataset", use_container_width=True)
+            #donations_button = st.sidebar.button("Donor registration", use_container_width=True)
             
     # Donor Registration page
-        if not dataset_button:
+        if not dataset_button :
             geolocator = Nominatim(user_agent="geoapi")
             st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 24px; font-weight: bold; color: #FF5A5A;">
         {get_text("REGISTRATION")}
@@ -1728,9 +2297,8 @@ def main_app():
                             Cardiaque = st.radio(get_text("Cardiac?"), ["No", "Yes"])
                             Tatoue = st.radio(get_text("Tattooed?"), ["No", "Yes"])
                             Scarifie = st.radio(get_text("Scarified?"), ["No", "Yes"])
-                        
-                    st.text_input(get_text("Other reasons, specify"))
-                        #Selectionner_ok = st.radio(get_text('Select "ok" to submit'), ["Ok", "No"])
+
+                    Numero =  st.text_input(get_text("Numéro de téléphone"))  
                     Si_autres_raison = st.text_input(get_text("If other reasons, specify"))
                         
                 if st.form_submit_button(get_text("Submit")):
@@ -1813,12 +2381,17 @@ def main_app():
                                 message(f"""The Volonteer is  Temporarily Non Eligible  😔😔""")
                             else : 
                                 message(f"""Le volontaire est  Temporairement Non-eligible😔😔""")
+                            st.markdown(f"<div style='text-align: center;'>- Reasons : </div>", unsafe_allow_html=True)
+                            for reason in check_eligibility(new_donor)['reasons']:
+                                st.markdown(f"<div style='text-align: center;'>- {reason}</div>", unsafe_allow_html=True)
                         else : 
                             if st.session_state.language == "English" :
                                 message(f"""The Volonteer is Definitely Non Eligible  😔😔""")
                             else : 
                                 message(f"""Le volontaire est  Definitivement Non-eligible😔😔""")
-        
+                            st.markdown(f"<div style='text-align: center;'>- Reasons : </div>", unsafe_allow_html=True)
+                            for reason in check_eligibility(new_donor)['reasons']:
+                                st.markdown(f"<div style='text-align: center;'>- {reason}</div>", unsafe_allow_html=True)      
 
                     
                     # Display registered donors
@@ -1828,6 +2401,53 @@ def main_app():
                     st.dataframe(recent_donors[display_columns])
         
         if dataset_button:
+            with st.form("_form"):
+                st.markdown(f"""<div class="card-title" style="text-align: center; font-size: 24px; font-weight: bold; color: #FF5A5A;">
+                    {get_text("Donor Registration")}
+                    </div> """,  unsafe_allow_html=True)
+                col = st.columns(2)
+                with col[0] : 
+                    Groupe_sanguin= st.selectbox(
+                                get_text ("District of Residence"),
+                                options=load_data3()["Groupe Sanguin ABO / Rhesus"].unique(),
+                                index=0,  # Sélectionner le premier élément par défaut
+                                help="Sélectionnez votre groupe"
+                            )
+                    Age =st.number_input(get_text("Age"), min_value=0, max_value=120, step=1)
+                with col[1] : 
+                    Horo = st.date_input(get_text("Filling Date"))
+                    Genre_ = st.radio(get_text("Gender"), ["Homme", "Femme"])
+                rhesus= st.selectbox(
+                    get_text ("District of Residence"),
+                    options=load_data3()["Phenotype"].unique(),
+                    index=0,  # Sélectionner le premier élément par défaut
+                    help="Sélectionnez votre Phénotype"
+                )
+                st.markdown("");st.markdown("");st.markdown("")
+                if st.form_submit_button(get_text("Submit_")):
+                    if not Age or not rhesus :
+                        st.error("Please fill all required fields. It seems that you don't fill the date of birth")
+                    else:
+                        new_donor = pd.DataFrame({
+                        'age': [Age],
+                        'genre': [Genre_],
+                        'rhesus': [rhesus],
+                        'Horo': [Horo.strftime('%Y-%m-%d')],
+                        'Groupe_sanguin': [Groupe_sanguin]
+                    })
+                        st.success(f"Thank you! Donor has been successfully registered.")
+                        excel_file = "donnees.xlsx"
+                        book = load_workbook(excel_file)
+
+                        # Vérifier si 'Feuil1' existe
+                        if 'Feuil2' in book.sheetnames:
+                            with pd.ExcelWriter(excel_file, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+                                # Écrire le DataFrame à partir de la première ligne vide
+                                startrow = book['Feuil2'].max_row  # Trouver la première ligne vide
+                                new_donor.to_excel(writer, index=False, header=False, startrow=startrow, sheet_name='Feuil2')
+    
+
+
             st.markdown(f"<h2 class='sub-header'>{get_text('NOUVELLE BASE DE DONNEES')}</h2>", unsafe_allow_html=True)
             st.dataframe(pd.read_excel("donnees.xlsx"))
 
@@ -2392,16 +3012,458 @@ def main_app():
                     )
                     ""
 
+    elif selected_item=='AI Extensions' :
+        import logging
+        import subprocess
+        import sys
+        from dotenv import load_dotenv
+        from docx import Document
+        from docx.shared import Inches, Pt
+        from docx.oxml import OxmlElement
+        from datetime import datetime
+        from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 
-def main():
-    # Si l'utilisateur n'est pas authentifié, afficher le formulaire de connexion
-    if not st.session_state["authenticated"]:
-        login_form()
-    else:
-        # Si l'utilisateur est authentifié, afficher le contenu principal
-        main_app()
+        # Configurer le logging
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
 
+        def install(package):
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+        # Check and install required packages
+        required_packages = {
+            "transformers": "transformers",
+            "groq": "groq",
+            "docx": "python-docx",
+            "matplotlib": "matplotlib"
+        }
+
+        for module, package in required_packages.items():
+            try:
+                __import__(module)
+            except ImportError as e:
+                logger.warning(f"{module} package not found: {e}")
+                install(package)
+
+        # Import after potential installation
+        try:
+            from groq import Groq
+        except ImportError as e:
+            logger.error(f"Failed to import Groq after installation attempt: {e}")
+            Groq = None
+
+        # Import document libraries
+        try:
+            from docx import Document
+            from docx.shared import Inches
+        except ImportError as e:
+            logger.error(f"Failed to import python-docx: {e}")
+
+        load_dotenv()
+
+        # API keys
+        groq_api_key = os.getenv("groq_api_key")
+
+        # Function to inject CSS
+        def inject_css(css_file):
+            try:
+                with open(css_file) as f:
+                    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+            except FileNotFoundError:
+                logger.warning(f"CSS file {css_file} not found")
+
+        # Try to inject CSS
+        try:
+            inject_css('styles.css')
+        except Exception as e:
+            logger.warning(f"Could not inject CSS: {e}")
+
+
+
+        tab_rapport, tab_chatbot_dons, tab_chatbot_medecin = st.tabs([
+            "Rapport Dynamique", 
+            "Chatbot Analyse Dons", 
+            "Chatbot Médecin"
+        ])
+
+        # API and model selection
+        api_provider = 'Groq'
+
+        # Initialize client variable
+        client = None
+
+        if api_provider == 'Groq':
+            client = Groq(api_key=groq_api_key)
+        
+
+        # Session state initialization
+        if "sessions" not in st.session_state:
+            st.session_state.sessions = [{"first_query": None, "history": []}]
+
+        if "current_session_index" not in st.session_state:
+            st.session_state.current_session_index = 0
+
+        if "editing_query_index" not in st.session_state:
+            st.session_state.editing_query_index = None
+
+        if "selected_graphs" not in st.session_state:
+            st.session_state.selected_graphs = []
+
+        if "graph_interpretations" not in st.session_state:
+            st.session_state.graph_interpretations = {}
+
+        # Generate dashboard data if not present
+        if "dashboard_data" not in st.session_state:
+            st.session_state.dashboard_data = load_data1()
+
+        # Function for Groq API interaction
+        def get_groq_response(messages):
+            if client is None:
+                return "API client not initialized. Please check your configuration."
+            
+            try:
+                response = client.chat.completions.create(
+                    model='Llama3-8b-8192',
+                    messages=messages
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"Error calling Groq API: {e}")
+                return f"Erreur lors de la communication avec l'API ou la connexion n'est stable. \n Vous pouvez regénérer le rapport: {str(e)}"
+
+        def interpret_pie_chart(graph_name, data):
+            if api_provider == 'Groq' and client:
+                # Vérifie si la colonne existe
+                if graph_name in data.columns:
+                    # Calcul des fréquences relatives
+                    distribution = data[graph_name].value_counts(normalize=True).sort_values(ascending=False)
+                    total_counts = data[graph_name].value_counts()
+                    
+                    top_categories = distribution.head(3)
+                    formatted_dist = "\n".join([f"- {cat}: {perc*100:.1f}% ({total_counts[cat]} occurrences)" 
+                                                for cat, perc in top_categories.items()])
+                    
+                    prompt = f"""Voici la répartition des catégories pour le graphique en secteur '{graph_name}' :
+                    {formatted_dist}
+                    
+                    Fournis une interprétation professionnelle et concise en 3-5 phrases en français, comme un statisticien spécialisé dans la santé publique au Cameroun. Mentionne les catégories dominantes, les éventuelles disparités et implications potentielles dans le contexte camerounais."""
+
+                    messages = [
+                        {"role": "system", "content": "Tu es un expert en analyse de données médicales et de don de sang."},
+                        {"role": "user", "content": prompt}
+                    ]
+                    
+                    return get_groq_response(messages)
+                else:
+                    return f"Pas de données disponibles pour '{graph_name}'."
+            else:
+                return f"Analyse du graphique en secteur '{graph_name}': la répartition des catégories montre une dominance claire de certaines classes. Une exploration plus poussée pourrait éclairer les implications sociales ou médicales selon le contexte camerounais."
+
+        # Function to create graphs for the report
+        def create_graph_image(data, column, title):    
+            buf = prepare_frequency_donut_plot(data[column])
+            return buf
+
+
+
+        # Function to create a Word document with graphs and interpretations
+        def create_word_report(selected_graphs, interpretations, data):
+            #insert image
+            image_path = "indabax_image.jpg"
+
+        # Ouvre l'image et la convertit en bytes
+            
+            doc = Document()
+            
+            with open(image_path, 'rb') as file:
+                # Lit le contenu de l'image
+                image_bytes = file.read()
+                
+                # Crée un objet BytesIO à partir des bytes
+                bytes_io = io.BytesIO(image_bytes)
+                
+                # Optionnel : pour vérifier que ça fonctionne, on peut repositionner le curseur au début
+                bytes_io.seek(0)
+        
+            doc.add_picture(bytes_io, width=Inches(6))
+            
+            doc.add_paragraph("\n")
+            
+            title = doc.add_heading('RAPPORT D\'ANALYSE DES DONS DE SANG', 0)
+            # Centrer le titre
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            run = title.runs[0]
+            #run.font.color.rgb = RGBColor(255, 0, 0)  # Rouge
+            run.font.name = 'Aptos'
+            run.font.size = Pt(24)
+            run.font.bold = True
+
+            # Ajouter un encadré bleu autour du titre
+            paragraph = title._element
+            pPr = paragraph.get_or_add_pPr()
+            border = OxmlElement('w:pBdr')
+
+            # Définir les bordures (bleues, 2.25 pt) 
+            
+            # Add date
+            rep = doc.add_paragraph(f"Ce rapport a été créé le {datetime.now().strftime('%d/%m/%Y à %H:%M')}")
+            doc.add_paragraph("\n")
+            rep.alignment = WD_PARAGRAPH_ALIGNMENT.JUSTIFY
+            
+            #doc.add_heading('Table des Matières', level=1)
+            #for i, graph_name in enumerate(selected_graphs, start=1):
+            # doc.add_paragraph(f"Analyse de :  {graph_name}", style='List Bullet')
+            #doc.add_page_break()
+            
+            # Introduction
+            doc.add_heading('Introduction', level=1)
+            doc.add_paragraph("Le don de sang constitue un acte altruiste et essentiel pour répondre aux besoins médicaux " 
+                            "des populations, notamment dans des contextes où les réserves sanguines sont souvent "
+                            "insuffisantes, comme au Cameroun. Dans ce cadre, la compréhension des dynamiques de " 
+                            "mobilisation, d’éligibilité et de fidélisation des donneurs est cruciale pour optimiser les campagnes " 
+                            "de collecte et garantir un approvisionnement constant en sang. Ce rapport présente une analyse " 
+                            "approfondie des données issues d’une campagne de don de sang, s’appuyant sur un tableau de bord " 
+                            "interactif conçu pour faciliter la prise de décision. À travers une série d’indicateurs clés, de " 
+                            "visualisations graphiques et de recommandations stratégiques, nous examinons les profils des "
+                            "volontaires, les raisons d’éligibilité ou d’inéligibilité, ainsi que les tendances de participation selon " 
+                            "divers critères démographiques et socio-professionnels. L’objectif est double : d’une part, identifier " 
+                            "les facteurs qui favorisent ou entravent la participation au don de sang, et d’autre part, proposer " 
+                            "des actions concrètes pour améliorer l’efficacité des futures campagnes, tout en renforçant " 
+                            "l’engagement des donneurs, notamment les plus récurrents. Ce travail s’inscrit dans une démarche " 
+                            "d’amélioration continue des initiatives de santé publique, en mettant l’accent sur l’inclusion, la " 
+                            "sensibilisation et l’optimisation des ressources disponibles.\n "   
+                            ""       
+                            "   Le présent rapport donne une analyse détaillée des données de don de sang, " 
+                            "avec des graphiques sélectionnés et leurs interprétations. "
+                            "Ces analyses peuvent aider à optimiser les campagnes futures et à améliorer la gestion des stocks.")
+            
+            # Add each selected graph with its interpretation
+            for graph_name in selected_graphs:
+                doc.add_heading(f'Analyse: {graph_name}', level=1)
+                
+                # Create and add the graph image
+                img_buf = create_graph_image(data, graph_name, f"Évolution de {graph_name}")
+                doc.add_picture(img_buf)
+                
+                # Add interpretation
+                doc.add_heading('Interprétation', level=2)
+                doc.add_paragraph(interpretations.get(graph_name, "Pas d'interprétation disponible"))
+                
+                # Add spacer
+                doc.add_paragraph("\n")
+            
+            # Conclusion
+            if selected_graphs:
+                doc.add_heading('Conclusion', level=1)
+                doc.add_paragraph("L'analyse des graphiques sélectionnés révèle des informations importantes "
+                                "sur les tendances des dons de sang. Ces insights peuvent être utilisés pour "
+                                "optimiser les campagnes futures et améliorer la gestion des stocks sanguins.")
+            
+            # Save to BytesIO object
+            doc_io = io.BytesIO()
+            doc.save(doc_io)
+            doc_io.seek(0)
+            return doc_io
+
+        # Function to create download link
+        def get_binary_file_downloader_html(bin_file, file_label='File'):
+            bin_str = base64.b64encode(bin_file.read()).decode()
+            href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{file_label}">Télécharger le rapport</a>'
+            return href
+
+        # Page 2: Dynamic Report
+        with tab_rapport:
+            st.title("Rapport Dynamique - Créer et Télécharger")
+            
+            # Explanation
+            st.write("""
+            Créez un rapport personnalisé en sélectionnant les graphiques qui vous intéressent.
+            Chaque graphique sera accompagné d'une interprétation générée par l'IA.
+            Vous pourrez ensuite télécharger le rapport au format Word.
+            """)
+            
+            # Select graphs for the report
+            st.subheader("Sélectionner les graphiques pour le rapport")
+            
+            available_graphs = [col for col in st.session_state.dashboard_data.columns[2:] ]
+            selected_graphs = st.multiselect(
+                "Choisissez les graphiques à inclure dans le rapport",
+                available_graphs,
+                default=st.session_state.selected_graphs
+            )
+            
+            # Update the selected graphs in session state
+            st.session_state.selected_graphs = selected_graphs
+            
+            # Display preview of selected graphs
+            if selected_graphs:
+                st.subheader("Aperçu des graphiques sélectionnés")
+                
+                # Use columns to display multiple graphs side by side
+                for i in range(0, len(selected_graphs), 2):
+                    cols = st.columns(2)
+                    for j in range(2):
+                        if i + j < len(selected_graphs):
+                            graph_name = selected_graphs[i + j]
+                            with cols[j]:
+                                st.write(f"**{graph_name}**")
+                                render_frequency_pieh(load_data1()[graph_name], legend_left="70%", legend_top="65%")
+                                
+                                # Generate or display interpretation
+                                if graph_name not in st.session_state.graph_interpretations:
+                                    with st.spinner(f"Génération de l'interprétation pour {graph_name}..."):
+                                        interpretation = interpret_pie_chart(graph_name, st.session_state.dashboard_data)
+                                        st.session_state.graph_interpretations[graph_name] = interpretation
+                                
+                                st.write("**Interprétation:**")
+                                st.write(st.session_state.graph_interpretations[graph_name])
+                
+                # Option to regenerate interpretations
+                if st.button("Régénérer toutes les interprétations"):
+                    with st.spinner("Régénération des interprétations..."):
+                        st.success("Interprétations régénérées avec succès!")
+                        for graph_name in selected_graphs:
+                            st.session_state.graph_interpretations[graph_name] = interpret_pie_chart(
+                                graph_name, st.session_state.dashboard_data
+                            )
+                        
+                
+                # Generate and download report
+                st.subheader("Générer et télécharger le rapport")
+                
+                report_title = st.text_input("Titre du rapport", "Rapport d'Analyse des Dons de Sang")
+                
+                if st.button("Générer le rapport Word"):
+                    with st.spinner("Génération du rapport en cours..."):
+                        # Create the Word document
+                        report_io = create_word_report(
+                            selected_graphs,
+                            st.session_state.graph_interpretations,
+                            st.session_state.dashboard_data
+                        )
+                        
+                        # Display download link
+                        st.success("Rapport généré avec succès!")
+                        st.markdown(
+                            get_binary_file_downloader_html(
+                                report_io, 
+                                f"{report_title.replace(' ', '_')}.docx"
+                            ),
+                            unsafe_allow_html=True
+                        )
+            else:
+                st.info("Veuillez sélectionner au moins un graphique pour créer le rapport.")
+
+        # Page 3: Blood Donation Analysis Chatbot
+        with tab_chatbot_dons:
+            st.title("Chatbot - Analyse des Dons de Sang")
+
+            if "messages_dons" not in st.session_state:
+                st.session_state.messages_dons = [
+                    {"role": "assistant", "content": "Salut ! Je peux analyser les données de la campagne de don de sang et te donner des conseils. Pose-moi une question sur les graphiques ou les tendances !"}
+                ]
+
+            for msg in st.session_state.messages_dons:
+                with st.chat_message(msg["role"]):
+                    st.write(msg["content"])
+
+            if prompt := st.chat_input("Pose une question sur les données ou demande un conseil"):
+                st.session_state.messages_dons.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.write(prompt)
+                    context = f"Données de la campagne de don de sang (résumé): {st.session_state.dashboard_data}. Question: {prompt}"
+                
+                messages = [
+                    {"role": "system", "content": "Tu e expert en analyse de données sur les campagnes de don de sang. Interprète les graphiques; fais des analyses precises, ne fournit aucun code  et donne des conseils contextuels basés sur les données fournies."},
+                    {"role": "user", "content": context}
+                ]
+
+                with st.chat_message("assistant"):
+                    if api_provider == 'Groq':
+                        reply = get_groq_response(messages)
+                    #else:
+                        #reply = get_huggingface_response(context, generator)
+                        
+                    st.write(reply)
+                    st.session_state.messages_dons.append({"role": "assistant", "content": reply})
+
+        # Page 4: Medical Chatbot
+        with tab_chatbot_medecin:
+            st.title("Chatbot - Médecin Virtuel")
+
+            if "messages_medecin" not in st.session_state:
+                st.session_state.messages_medecin = [
+                    {"role": "assistant", "content": "Bonjour ! Je suis un médecin virtuel. Pose-moi n'importe quelle question médicale, je te répondrai avec précision et te donnerai des conseils adaptés."}
+                ]
+
+            for msg in st.session_state.messages_medecin:
+                with st.chat_message(msg["role"]):
+                    st.write(msg["content"])
+
+            if prompt := st.chat_input("Pose une question médicale"):
+                st.session_state.messages_medecin.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.write(prompt)
+
+                messages = [
+                    {"role": "system", "content": "Tu es un médecin expert avec des années d'expérience. Réponds aux questions médicales de manière précise, professionnelle et compréhensible. Si nécessaire, donne des conseils pratiques ou recommande de consulter un professionnel en personne. Ne fais pas de diagnostics définitifs, mais offre des informations utiles."},
+                    {"role": "user", "content": prompt}
+                ]
+
+                with st.chat_message("assistant"):
+                    if api_provider == 'Groq':
+                        reply = get_groq_response(messages)
+                    #else:
+                        #reply = get_huggingface_response(prompt, generator)
+                        
+                    st.write(reply)
+                    st.session_state.messages_medecin.append({"role": "assistant", "content": reply})
+
+
+
+def file_upload_page():
+    st.markdown(
+        f"""
+        <style>
+            .block-container {{
+                padding-top: 2.5rem;
+                padding-left: 25rem;
+                padding-right: 25rem;
+                position: relative;
+                z-index: 1;
+            }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    col = st.columns(3)
+    with col[1]:
+        st.image("OIP.jpeg", width=400)
+    st.title("Upload a File")
+    uploaded_file = st.file_uploader("Choose a file", type=["csv", "xls", "xlsx"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            # Store the DataFrame in session state but do NOT proceed until validated
+            st.session_state["uploaded_data"] = df
+            st.session_state["file_uploaded"] = True  # File is uploaded
+
+            st.write("Data Preview: First seven observations")
+            st.dataframe(df.head(7))
+
+            # Show the validate button
+            if st.button("Validate File"):
+                st.session_state["file_validated"] = True  # Mark file as validated
+
+        except Exception as e:
+            st.error(f"Error reading the file: {e}")
+
+
+# Fonction principale pour contrôler le flux de l'application
+# Exécuter l'application
 if __name__ == "__main__":
     main()
-
-
