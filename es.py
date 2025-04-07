@@ -21,8 +21,12 @@ import hashlib
 import qrcode
 import io
 from pathlib import Path
+from dotenv import load_dotenv
 
+load_dotenv()
 
+# Access the token
+hf_token = os.getenv("HUGGINGFACE_TOKEN")
 
 
 st.set_page_config(
